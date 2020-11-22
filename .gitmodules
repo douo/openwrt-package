@@ -1,0 +1,12 @@
+[submodule "douo/luci-app-tinyfecvpn"]
+	path = douo/luci-app-tinyfecvpn
+	url = https://github.com/douo/luci-app-tinyfecvpn
+[submodule "douo/wrtbwmon"]
+	path = douo/wrtbwmon
+	url = https://github.com/brvphoenix/wrtbwmon.git
+[submodule "douo/luci-app-wrtbwmon"]
+	path = douo/luci-app-wrtbwmon
+	url = https://github.com/brvphoenix/luci-app-wrtbwmon.git
+[submodule "douo/luci-app-udp2raw"]
+	path = douo/luci-app-udp2raw
+	url = https://github.com/douo/luci-app-udp2raw.git
