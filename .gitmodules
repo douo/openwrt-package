@@ -10,3 +10,6 @@
 [submodule "douo/luci-app-udp2raw"]
 	path = douo/luci-app-udp2raw
 	url = https://github.com/douo/luci-app-udp2raw.git
+[submodule "openwrt-passwall"]
+	path = openwrt-passwall
+	url = https://github.com/xiaorouji/openwrt-passwall.git
