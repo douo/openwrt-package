@@ -7,7 +7,7 @@
 
 include $(TOPDIR)/rules.mk
 
-PKG_NAME:=kcptun_passwall
+PKG_NAME:=kcptun
 PKG_VERSION:=20210103
 PKG_RELEASE:=1
 
