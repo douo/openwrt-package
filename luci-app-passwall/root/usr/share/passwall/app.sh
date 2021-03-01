@@ -387,14 +387,17 @@ load_config() {
 		echolog "没有选择节点！"
 		NO_PROXY=1
 	}
-
+        # 各个代理模式是否有被启用
 	global=$(echo "${TCP_PROXY_MODE}${LOCALHOST_TCP_PROXY_MODE}${UDP_PROXY_MODE}${LOCALHOST_UDP_PROXY_MODE}" | grep "global")
 	returnhome=$(echo "${TCP_PROXY_MODE}${LOCALHOST_TCP_PROXY_MODE}${UDP_PROXY_MODE}${LOCALHOST_UDP_PROXY_MODE}" | grep "returnhome")
 	chnlist=$(echo "${TCP_PROXY_MODE}${LOCALHOST_TCP_PROXY_MODE}${UDP_PROXY_MODE}${LOCALHOST_UDP_PROXY_MODE}" | grep "chnroute")
 	gfwlist=$(echo "${TCP_PROXY_MODE}${LOCALHOST_TCP_PROXY_MODE}${UDP_PROXY_MODE}${LOCALHOST_UDP_PROXY_MODE}" | grep "gfwlist")
+
 	DNS_MODE=$(config_t_get global dns_mode pdnsd)
 	DNS_FORWARD=$(config_t_get global dns_forward 8.8.4.4:53 | sed 's/:/#/g')
+        # 控制 pdnsd cache ,未启用
 	DNS_CACHE=$(config_t_get global dns_cache 0)
+        # 不再控制 LOCAL_DNS
 	LOCAL_DNS="default"
 	if [ "${LOCAL_DNS}" = "default" ]; then
 		DEFAULT_DNS=$(uci show dhcp | grep "@dnsmasq" | grep "\.server=" | awk -F '=' '{print $2}' | sed "s/'//g" | tr ' ' ',')
@@ -658,6 +661,7 @@ run_redir() {
 			ln_start_bin "$(first_type ${type}-redir)" "${type}-redir" $log_file -c "$config_file" -v $extra_param
 		;;
 		esac
+                # 不支持  iptables(REDIRECT/TPROXY) 流量的客户端，需要用 ipt2socks 转
 		if [ -n "$_socks_flag" ]; then
 			local extra_param="-T"
 			[ "$UDP_NODE" == "tcp" ] && extra_param=""
@@ -666,6 +670,7 @@ run_redir() {
 		unset _socks_flag _socks_address _socks_port _socks_username _socks_password
 
 		[ "$type" != "xray" ] && {
+                        # 非 xray 需要再启动一个 socks 进程
 			[ "$tcp_node_socks" = "1" ] && {
 				local port=$tcp_node_socks_port
 				local config_file=$TMP_PATH/SOCKS_$tcp_node_socks_id.json
@@ -736,7 +741,6 @@ node_switch() {
 
 # 开启代理服务
 # ARG:
-#  - 名称前缀
 #  - tcp/udp
 start_redir() {
 	eval node=\$${1}_NODE
