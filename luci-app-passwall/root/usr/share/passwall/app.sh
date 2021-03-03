@@ -389,8 +389,11 @@ load_config() {
 	}
         # 各个代理模式是否有被启用
 	global=$(echo "${TCP_PROXY_MODE}${LOCALHOST_TCP_PROXY_MODE}${UDP_PROXY_MODE}${LOCALHOST_UDP_PROXY_MODE}" | grep "global")
+        # 匹配 chnlist 的走代理
 	returnhome=$(echo "${TCP_PROXY_MODE}${LOCALHOST_TCP_PROXY_MODE}${UDP_PROXY_MODE}${LOCALHOST_UDP_PROXY_MODE}" | grep "returnhome")
+        # 不匹配 chnlist 的走代理
 	chnlist=$(echo "${TCP_PROXY_MODE}${LOCALHOST_TCP_PROXY_MODE}${UDP_PROXY_MODE}${LOCALHOST_UDP_PROXY_MODE}" | grep "chnroute")
+        # 匹配 gfwlist 走代理
 	gfwlist=$(echo "${TCP_PROXY_MODE}${LOCALHOST_TCP_PROXY_MODE}${UDP_PROXY_MODE}${LOCALHOST_UDP_PROXY_MODE}" | grep "gfwlist")
 
 	DNS_MODE=$(config_t_get global dns_mode pdnsd)
@@ -887,7 +890,7 @@ start_dns() {
 		echolog "  - 不过滤DNS..."
 		TUN_DNS=""
 	;;
-	dns2socks)
+	dns2socks) # 通过 socks 代理请求远程 dns
 		local dns2socks_socks_server=$(echo $(config_t_get global socks_server 127.0.0.1:9050) | sed "s/#/:/g")
 		local dns2socks_forward=$(get_first_dns DNS_FORWARD 53 | sed 's/#/:/g')
 		[ "$DNS_CACHE" == "0" ] && local dns2sock_cache="/d"
@@ -896,7 +899,7 @@ start_dns() {
 		echolog "  - 域名解析：dns2socks..."
 	;;
 	xray_doh)
-                # doh 需要转发成标准的 dns，才能为 dnsmasq 所用
+
 		up_trust_doh_dns=$(config_t_get global up_trust_doh_dns "tcp")
 		if [ "$up_trust_doh_dns" = "socks" ]; then
 			use_tcp_node_resolve_dns=0
@@ -912,6 +915,7 @@ start_dns() {
 		_doh_port=$(echo $_doh_host_port | awk -F ':' '{print $2}')
 		_doh_bootstrap=$(echo $up_trust_doh | cut -d ',' -sf 2-)
 
+                # 冗余代码
 		up_trust_doh_dns=$(config_t_get global up_trust_doh_dns "tcp")
 		if [ "$up_trust_doh_dns" = "socks" ]; then
 			socks_server=$(echo $(config_t_get global socks_server 127.0.0.1:9050) | sed "s/#/:/g")
@@ -956,7 +960,8 @@ start_dns() {
 
 	[ -n "$chnlist" ] && [ "$DNS_MODE" != "custom" ] && [ "$DNS_MODE" != "fake_ip" ] && {
 		[ -f "${RULES_PATH}/chnlist" ] && cp -a "${RULES_PATH}/chnlist" "${TMP_PATH}/chnlist"
-		[ -n "$(first_type chinadns-ng)" ] && {
+                # 有安装 chinadns-ng 则自动启用
+                [ -n "$(first_type chinadns-ng)" ] && {
 			echolog "发现ChinaDNS-NG，将启动。"
 			CHINADNS_NG=1
 		}
