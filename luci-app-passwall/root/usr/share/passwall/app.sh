@@ -1090,6 +1090,15 @@ add_dnsmasq() {
 				sort -u "${TMP_PATH}/gfwlist.txt" | gen_dnsmasq_items "gfwlist,gfwlist6" "${fwd_dns}" "${TMP_DNSMASQ_PATH}/99-gfwlist.conf"
 				echolog "  - [$?]防火墙域名表(gfwlist)：${fwd_dns:-默认}"
 			fi
+
+                        # Not China List 模式
+                        if [ -n "${chnlist}" ]; then
+                            fwd_dns="${LOCAL_DNS}"
+		            [ -n "$CHINADNS_NG" ] && unset fwd_dns
+		            sort -u "${RULES_PATH}/chnlist" | gen_dnsmasq_items "chnroute,chnroute6" "${fwd_dns}" "${TMP_DNSMASQ_PATH}/10-chinalist_host.conf"
+		            echolog "  - [$?]中国域名表(chnroute)：${fwd_dns:-默认}"
+                        fi
+
 		else
 			#回国模式
 			if [ "${DNS_MODE}" = "fake_ip" ]; then
