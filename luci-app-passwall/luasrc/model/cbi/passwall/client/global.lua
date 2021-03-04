@@ -149,7 +149,7 @@ if has_xray and #nodes_table > 0 then
         o.write = function(self, section, value)
             m:set(v.id, id, value)
         end
-        
+
         local id = "main_node"
         o = s:taboption("Main", ListValue, v.id .. "." .. id, "* " .. translate("Default") .. translate("Preproxy"))
         o:depends("tcp_node", v.id)

@@ -13,8 +13,11 @@ local brook = require("luci.model.cbi." .. appname ..".api.brook")
 local xray = require("luci.model.cbi." .. appname ..".api.xray")
 local trojan_go = require("luci.model.cbi." .. appname ..".api.trojan_go")
 
+local v2ray = require("luci.model.cbi." .. appname ..".api.v2ray")
+
+
 function index()
-	appname = require "luci.model.cbi.passwall.api.api".appname
+	appname = passwall
 	entry({"admin", "services", appname}).dependent = true
 	entry({"admin", "services", appname, "reset_config"}, call("reset_config")).leaf = true
 	entry({"admin", "services", appname, "show"}, call("show_menu")).leaf = true
@@ -73,6 +76,8 @@ function index()
 	entry({"admin", "services", appname, "brook_update"}, call("brook_update")).leaf = true
 	entry({"admin", "services", appname, "xray_check"}, call("xray_check")).leaf = true
 	entry({"admin", "services", appname, "xray_update"}, call("xray_update")).leaf = true
+	entry({"admin", "services", appname, "v2ray_check"}, call("v2ray_check")).leaf = true
+	entry({"admin", "services", appname, "v2ray_update"}, call("v2ray_update")).leaf = true
 	entry({"admin", "services", appname, "trojan_go_check"}, call("trojan_go_check")).leaf = true
 	entry({"admin", "services", appname, "trojan_go_update"}, call("trojan_go_update")).leaf = true
 end
@@ -269,7 +274,7 @@ function clear_all_nodes()
 	ucic:foreach(appname, "nodes", function(node)
 		ucic:delete(appname, node['.name'])
 	end)
-	
+
 	local function clear(type)
 		local node_num = ucic:get(appname, "@global_other[0]", type .. "_node_num") or 1
 		for i = 1, node_num, 1 do
@@ -407,6 +412,25 @@ function xray_update()
 		json = xray.to_move(http.formvalue("file"))
 	else
 		json = xray.to_download(http.formvalue("url"))
+	end
+
+	http_write_json(json)
+end
+
+function v2ray_check()
+	local json = v2ray.to_check("")
+	http_write_json(json)
+end
+
+function v2ray_update()
+	local json = nil
+	local task = http.formvalue("task")
+	if task == "extract" then
+		json = v2ray.to_extract(http.formvalue("file"), http.formvalue("subfix"))
+	elseif task == "move" then
+		json = v2ray.to_move(http.formvalue("file"))
+	else
+		json = v2ray.to_download(http.formvalue("url"))
 	end
 
 	http_write_json(json)

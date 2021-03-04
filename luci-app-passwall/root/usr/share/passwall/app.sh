@@ -446,7 +446,7 @@ run_socks() {
 		msg="某种原因，此 Socks 服务的相关配置已失联，启动中止！"
 	fi
 
-	if [ "$type" == "xray" ] && ([ -n "$(config_n_get $node balancing_node)" ] || [ "$(config_n_get $node default_node)" != "_direct" -a "$(config_n_get $node default_node)" != "_blackhole" ]); then
+	if [ "$type" == "xray"  -o "$type" == "v2ray" ] && ([ -n "$(config_n_get $node balancing_node)" ] || [ "$(config_n_get $node default_node)" != "_direct" -a "$(config_n_get $node default_node)" != "_blackhole" ]); then
 		unset msg
 	fi
 
@@ -457,6 +457,17 @@ run_socks() {
 	[ "$bind" != "127.0.0.1" ] && echolog "  - 启动 ${bind}:${socks_port}  - 节点：$remarks${tmp}"
 
 	case "$type" in
+
+        # revert v2ray 支持
+        v2ray)
+		[ "$http_port" != "0" ] && {
+			local extra_param="-http_proxy_port $http_port"
+			config_file=$(echo $config_file | sed "s/SOCKS/HTTP_SOCKS/g")
+		}
+		lua $API_GEN_XRAY -node $node -socks_proxy_port $socks_port $extra_param > $config_file
+		ln_start_bin "$(first_type $(config_t_get global_app v2ray_file) v2ray)" v2ray $log_file -config="$config_file"
+	;;
+
 	socks|\
 	xray)
 		[ "$http_port" != "0" ] && {
@@ -493,7 +504,7 @@ run_socks() {
 	esac
 
 	# http to socks
-	[ "$type" != "xray" ] && [ "$type" != "socks" ] && [ "$http_port" != "0" ] && [ "$http_config_file" != "nil" ] && {
+	[ "$type" != "xray" -a "$type" != "v2ray" ] && [ "$type" != "socks" ] && [ "$http_port" != "0" ] && [ "$http_config_file" != "nil" ] && {
 		lua $API_GEN_XRAY_PROTO -local_proto http -local_address "0.0.0.0" -local_port $http_port -server_proto socks -server_address "127.0.0.1" -server_port $socks_port -server_username $_username -server_password $_password > $http_config_file
 		echo lua $API_GEN_XRAY_PROTO -local_proto http -local_address "0.0.0.0" -local_port $http_port -server_proto socks -server_address "127.0.0.1" -server_port $socks_port -server_username $_username -server_password $_password
 		ln_start_bin "$(first_type $(config_t_get global_app xray_file) xray)" xray $log_file -config="$http_config_file"
@@ -540,7 +551,7 @@ run_redir() {
 			eval port=\$UDP_REDIR_PORT
 			ln_start_bin "$(first_type ipt2socks)" "ipt2socks_udp" $log_file -U -l "$port" -b 0.0.0.0 -s "$node_address" -p "$node_port" -R -v
 		;;
-		xray)
+		xray|v2ray)
 			local loglevel=$(config_t_get global loglevel "warning")
 			lua $API_GEN_XRAY -node $node -proto udp -redir_port $local_port -loglevel $loglevel > $config_file
 			ln_start_bin "$(first_type $(config_t_get global_app xray_file) xray)" xray $log_file -config="$config_file"
@@ -602,21 +613,17 @@ run_redir() {
 		;;
 		xray)
 			local loglevel=$(config_t_get global loglevel "warning")
-			local proto="-proto tcp"
-			[ "$UDP_NODE" == "tcp" ] && proto="-proto tcp,udp"
-			local extra_param="${proto}"
-			[ "$tcp_node_socks" = "1" ] && {
-				local socks_param="-socks_proxy_port $tcp_node_socks_port"
-				extra_param="${extra_param} ${socks_param}"
-				config_file=$(echo $config_file | sed "s/TCP/TCP_SOCKS_$tcp_node_socks_id/g")
-			}
-			[ "$tcp_node_http" = "1" ] && {
-				local http_param="-http_proxy_port $tcp_node_http_port"
-				extra_param="${extra_param} ${http_param}"
-				config_file=$(echo $config_file | sed "s/TCP/TCP_HTTP_$tcp_node_http_id/g")
-			}
-			lua $API_GEN_XRAY -node $node -redir_port $local_port -loglevel $loglevel $extra_param > $config_file
+                        local extra_param="tcp"
+ 		       [ "$UDP_NODE" == "tcp" ] && extra_param="tcp,udp"
+ 		       lua $API_GEN_XRAY -node $node -proto $extra_param -redir_port $local_port -loglevel $loglevel > $config_file
 			ln_start_bin "$(first_type $(config_t_get global_app xray_file) xray)" xray $log_file -config="$config_file"
+		;;
+		v2ray)
+			local loglevel=$(config_t_get global loglevel "warning")
+			local extra_param="tcp"
+			[ "$UDP_NODE" == "tcp" ] && extra_param="tcp,udp"
+			lua $API_GEN_XRAY -node $node -proto $extra_param -redir_port $local_port -loglevel $loglevel > $config_file
+			ln_start_bin "$(first_type $(config_t_get global_app v2ray_file) v2ray)" v2ray $log_file -config="$config_file"
 		;;
 		trojan-go)
 			local loglevel=$(config_t_get global trojan_loglevel "2")

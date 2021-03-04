@@ -111,7 +111,10 @@ local function start()
                 bin = ln_start("/usr/bin/" .. type .. "-server", type .. "-server", "-c " .. config_file .. " " .. udp_param, log_path)
             elseif type == "Xray" then
                 config = require("luci.model.cbi.passwall.server.api.xray").gen_config(user)
-                bin = ln_start(api.get_xray_path(), "xray", "-config=" .. config_file, log_path)
+                bin = ln_start(_api.get_xray_path(), "xray", "-config=" .. config_file, log_path)
+            elseif type == "V2ray" then
+                config = require("luci.model.cbi.passwall.server.api.v2ray").gen_config(user)
+                bin = ln_start(_api.get_v2ray_path(), "v2ray", "-config=" .. config_file, log_path)
             elseif type == "Trojan" then
                 config = require("luci.model.cbi.passwall.server.api.trojan").gen_config(user)
                 bin = ln_start("/usr/sbin/trojan", "trojan", "-c " .. config_file, log_path)
@@ -147,7 +150,7 @@ local function start()
                 if udp_forward == 1 then
                     cmd(string.format('iptables -A PSW-SERVER -p udp --dport %s -m comment --comment "%s" -j ACCEPT', port, remarks))
                     cmd(string.format('ip6tables -A PSW-SERVER -p udp --dport %s -m comment --comment "%s" -j ACCEPT', port, remarks))
-                end 
+                end
             end
         end
     end)

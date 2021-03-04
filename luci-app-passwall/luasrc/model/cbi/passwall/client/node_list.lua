@@ -61,20 +61,13 @@ if true then
         local remarks = m:get(n, "remarks") or ""
         local type = m:get(n, "type") or ""
         str = str .. string.format("<input type='hidden' id='cbid.%s.%s.type' value='%s'/>", appname, n, type)
-        if type == "Xray" then
+        if type == "Xray" or type == "V2ray" then
             local protocol = m:get(n, "protocol")
             if protocol == "_balancing" then
-                protocol = "负载均衡"
+                type = type .. " 负载均衡"
             elseif protocol == "_shunt" then
-                protocol = "分流"
-            elseif protocol == "vmess" then
-                protocol = "VMess"
-            elseif protocol == "vless" then
-                protocol = "VLESS"
-            else
-                protocol = protocol:gsub("^%l",string.upper)
+                type = type .. " 分流"
             end
-            type = type .. " " .. protocol
         end
         local address = m:get(n, "address") or ""
         local port = m:get(n, "port") or ""
