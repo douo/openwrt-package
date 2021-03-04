@@ -17,7 +17,7 @@ local v2ray = require("luci.model.cbi." .. appname ..".api.v2ray")
 
 
 function index()
-	appname = passwall
+	appname = require "luci.model.cbi.passwall.api.api".appname
 	entry({"admin", "services", appname}).dependent = true
 	entry({"admin", "services", appname, "reset_config"}, call("reset_config")).leaf = true
 	entry({"admin", "services", appname, "show"}, call("show_menu")).leaf = true
