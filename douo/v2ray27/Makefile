@@ -22,7 +22,6 @@ PKG_MAINTAINER:=Tiou <dourokinga@gmail.com>
 
 PKG_CONFIG_DEPENDS:= \
 	CONFIG_V2RAY_COMPRESS_GOPROXY \
-	CONFIG_V2RAY_COMPRESS_UPX
 
 PKG_BUILD_DEPENDS:=golang/host
 PKG_BUILD_PARALLEL:=1
@@ -53,10 +52,6 @@ menu "V2Ray Configuration"
 config V2RAY_COMPRESS_GOPROXY
 	bool "Compiling with GOPROXY proxy"
 	default n
-
-config V2RAY_COMPRESS_UPX
-	bool "Compress executable files with UPX"
-	default y
 endmenu
 endef
 
@@ -64,13 +59,13 @@ define Package/$(PKG_NAME)/description
 Project V is a set of network tools that help you to build your own computer network.
 It secures your network connections and thus protects your privacy.
 
-  This package contains v2ray, v2ctl, geoip.dat and geosite.dat.
+  This package contains v2ray, v2ctl.
 endef
 
 ifeq ($(CONFIG_V2RAY_COMPRESS_GOPROXY),y)
 export GO111MODULE=on
 export GOPROXY=https://goproxy.io
-#export GOPROXY=https://mirrors.aliyun.com/goproxy/
+# export GOPROXY=https://mirrors.aliyun.com/goproxy/
 endif
 
 define Build/Prepare
@@ -80,15 +75,17 @@ endef
 define Build/Compile
 	$(eval GO_PKG_BUILD_PKG:=$(GO_PKG)/main)
 	$(call GoPackage/Build/Compile)
-	mv -f $(GO_PKG_BUILD_BIN_DIR)/main $(GO_PKG_BUILD_BIN_DIR)/v2ray27
-ifeq ($(CONFIG_V2RAY_COMPRESS_UPX),y)
-	$(STAGING_DIR_HOST)/bin/upx --lzma --best $(GO_PKG_BUILD_BIN_DIR)/v2ray27 || true
-endif
+	mv -f $(GO_PKG_BUILD_BIN_DIR)/main $(GO_PKG_BUILD_BIN_DIR)/v2ray
+
+	$(eval GO_PKG_BUILD_PKG:=$(GO_PKG)/infra/control/main)
+	$(call GoPackage/Build/Compile)
+	mv -f $(GO_PKG_BUILD_BIN_DIR)/main $(GO_PKG_BUILD_BIN_DIR)/v2ctl
 endef
 
 define Package/$(PKG_NAME)/install
-	$(INSTALL_DIR) $(1)/usr/bin/
-	$(INSTALL_BIN) $(GO_PKG_BUILD_BIN_DIR)/v2ray27 $(1)/usr/bin
+	$(INSTALL_DIR) $(1)/usr/bin/v2ray27
+	$(INSTALL_BIN) $(GO_PKG_BUILD_BIN_DIR)/v2ray $(1)/usr/bin/v2ray27
+	$(INSTALL_BIN) $(GO_PKG_BUILD_BIN_DIR)/v2ctl $(1)/usr/bin/v2ray27
 endef
 
 $(eval $(call GoBinPackage,$(PKG_NAME)))
