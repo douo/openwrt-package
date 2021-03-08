@@ -30,21 +30,21 @@ define Package/ucl
   BUILDONLY:=1
 endef
 
-define Package/node-yarn/description
+define Package/ucl/description
   The Ultimate Packer for eXecutables
 endef
 
 
 define Host/Prepare
 	$(Host/Prepare/Default)
-	mkdir -p $(STAGING_DIR_HOST)/include/ucl
+	mkdir -p $(HOST_BUILD_PREFIX)/include/ucl
 endef
 
 define Host/Configure
 	(cd $(HOST_BUILD_DIR); \
 	CC="$(HOSTCC)" \
 	CFLAGS="$(HOST_CFLAGS)" \
-	./configure --prefix=$(STAGING_DIR_HOST) \
+	./configure --prefix=$(HOST_BUILD_PREFIX) \
 	);
 	$(call Host/Configure/Default)
 endef
@@ -60,8 +60,9 @@ endef
 define Host/Clean
 	$(MAKE) -C $(HOST_BUILD_DIR) uninstall
 	rm -rf $(HOST_BUILD_DIR)
-	rm -rf $(STAGING_DIR_HOST)/include/ucl
+	rm -rf $(HOST_BUILD_PREFIX)/include/ucl
 endef
+
 
 $(eval $(call HostBuild))
 $(eval $(call BuildPackage,ucl))

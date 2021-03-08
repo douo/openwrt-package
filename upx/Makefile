@@ -14,6 +14,8 @@ PKG_SOURCE_URL:=https://github.com/upx/upx/releases/download/v$(PKG_VERSION)
 PKG_HASH:=3b0f55468d285c760fcf5ea865a070b27696393002712054c69ff40d8f7f5592
 
 HOST_BUILD_DIR:=$(BUILD_DIR_HOST)/$(PKG_NAME)-$(PKG_VERSION)-src
+PKG_HOST_ONLY:=1
+HOST_BUILD_DEPENDS:=ucl/host
 
 include $(INCLUDE_DIR)/host-build.mk
 include $(INCLUDE_DIR)/package.mk
@@ -31,7 +33,7 @@ endef
 
 
 define Host/Compile
-	UPX_UCLDIR=$(STAGING_DIR_HOST) \
+	UPX_UCLDIR=$(HOST_BUILD_PREFIX) \
 	$(MAKE) -C $(HOST_BUILD_DIR)/src \
 		CXXFLAGS_WERROR="" LDFLAGS="$(HOST_LDFLAGS)" \
 		CXX="$(HOSTCXX)"
