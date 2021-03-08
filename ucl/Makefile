@@ -20,6 +20,21 @@ include $(INCLUDE_DIR)/host-build.mk
 HOSTCC :=gcc
 HOST_CFLAGS +=-std=gnu89
 
+include $(INCLUDE_DIR)/package.mk
+
+define Package/ucl
+  SECTION:=utils
+  CATEGORY:=Utilities
+  TITLE:=The UCL Compression Library
+  URL:=http://www.oberhumer.com
+  BUILDONLY:=1
+endef
+
+define Package/node-yarn/description
+  The Ultimate Packer for eXecutables
+endef
+
+
 define Host/Prepare
 	$(Host/Prepare/Default)
 	mkdir -p $(STAGING_DIR_HOST)/include/ucl
@@ -49,3 +64,4 @@ define Host/Clean
 endef
 
 $(eval $(call HostBuild))
+$(eval $(call BuildPackage,ucl))
