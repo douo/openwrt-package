@@ -48,3 +48,81 @@ gen_fake_items() {
 		END {fflush(outf); close(outf); exit(fail);}
 	'
 }
+
+prepare_helper(){
+    	mkdir -p "${TMP_DNSMASQ_PATH}" "${DNSMASQ_PATH}" "/var/dnsmasq.d"
+	[ "$(config_t_get global_rules adblock 0)" = "1" ] && {
+		ln -s "${RULES_PATH}/adblock.conf" "${TMP_DNSMASQ_PATH}/adblock.conf"
+		echolog "  - [$?]广告域名表中域名解析请求直接应答为 '0.0.0.0'"
+	}
+
+	if [ "${DNS_MODE}" != "nouse" ]; then
+		echo "conf-dir=${TMP_DNSMASQ_PATH}" > "/var/dnsmasq.d/dnsmasq-${CONFIG}.conf"
+
+		if [ -z "${CHINADNS_NG}" ] && [ "${IS_DEFAULT_DNS}" = "1" ]; then
+			echolog "  - 不强制设置默认DNS"
+			return
+		else
+			echo "${DEFAULT_DNS}" > $TMP_PATH/default_DNS
+			msg="ISP"
+			servers="${LOCAL_DNS}"
+			[ -n "${chnlist}" ] && msg="中国列表以外"
+			[ -n "${returnhome}" ] && msg="中国列表"
+			[ -n "${global}" ] && msg="全局"
+
+			#默认交给Chinadns-ng处理
+			[ -n "$CHINADNS_NG" ] && {
+				servers="${china_ng_listen}" && msg="chinadns-ng"
+			}
+
+			cat <<-EOF >> "/var/dnsmasq.d/dnsmasq-${CONFIG}.conf"
+				$(echo "${servers}" | sed 's/,/\n/g' | gen_dnsmasq_items)
+				all-servers
+				no-poll
+				no-resolv
+			EOF
+			echolog "  - [$?]以上所列以外及默认(${msg})：${servers}"
+		fi
+	fi
+}
+
+restart_helper(){
+	if [ -f "$TMP_PATH/default_DNS" ]; then
+		backup_dnsmasq_servers
+		sed -i "/list server/d" /etc/config/dhcp >/dev/null 2>&1
+		/etc/init.d/dnsmasq restart >/dev/null 2>&1
+		restore_dnsmasq_servers
+	else
+		/etc/init.d/dnsmasq restart >/dev/null 2>&1
+	fi
+        echolog "重启 dnsmasq 服务[$?]"
+}
+
+
+backup_dnsmasq_servers() {
+	DNSMASQ_DNS=$(uci show dhcp | grep "@dnsmasq" | grep ".server=" | awk -F '=' '{print $2}' | sed "s/'//g" | tr ' ' ',')
+	if [ -n "${DNSMASQ_DNS}" ]; then
+		uci -q set $CONFIG.@global[0].dnsmasq_servers="${DNSMASQ_DNS}"
+		uci commit $CONFIG
+	fi
+}
+
+restore_dnsmasq_servers() {
+	OLD_SERVER=$(uci -q get $CONFIG.@global[0].dnsmasq_servers | tr "," " ")
+	for server in $OLD_SERVER; do
+		uci -q del_list dhcp.@dnsmasq[0].server=$server
+		uci add_list dhcp.@dnsmasq[0].server=$server
+	done
+	uci commit dhcp
+	uci -q delete $CONFIG.@global[0].dnsmasq_servers
+	uci commit $CONFIG
+}
+
+clean_helper() {
+        rm -rf $TMP_DNSMASQ_PATH $TMP_PATH
+	rm -rf /var/dnsmasq.d/dnsmasq-$CONFIG.conf
+	rm -rf $DNSMASQ_PATH/dnsmasq-$CONFIG.conf
+	rm -rf $TMP_DNSMASQ_PATH
+        /etc/init.d/dnsmasq restart >/dev/null 2>&1
+        echolog "重启 dnsmasq 服务[$?]"
+}
