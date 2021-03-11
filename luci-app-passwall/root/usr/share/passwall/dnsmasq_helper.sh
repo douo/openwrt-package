@@ -73,34 +73,6 @@ helper_prepare() {
 		echolog "  - [$?]广告域名表中域名解析请求直接应答为 '0.0.0.0'"
 	}
 
-	if [ "${DNS_MODE}" != "nouse" ]; then
-		echo "conf-dir=${TMP_DNSMASQ_PATH}" > "/var/dnsmasq.d/dnsmasq-${CONFIG}.conf"
-
-		if [ -z "${CHINADNS_NG}" ] && [ "${IS_DEFAULT_DNS}" = "1" ]; then
-			echolog "  - 不强制设置默认DNS"
-			return
-		else
-			echo "${DEFAULT_DNS}" > $TMP_PATH/default_DNS
-			msg="ISP"
-			servers="${LOCAL_DNS}"
-			[ -n "${chnlist}" ] && msg="中国列表以外"
-			[ -n "${returnhome}" ] && msg="中国列表"
-			[ -n "${global}" ] && msg="全局"
-
-			#默认交给Chinadns-ng处理
-			[ -n "$CHINADNS_NG" ] && {
-				servers="${china_ng_listen}" && msg="chinadns-ng"
-			}
-
-			cat <<-EOF >> "/var/dnsmasq.d/dnsmasq-${CONFIG}.conf"
-				$(echo "${servers}" | sed 's/,/\n/g' | gen_dnsmasq_items)
-				all-servers
-				no-poll
-				no-resolv
-			EOF
-			echolog "  - [$?]以上所列以外及默认(${msg})：${servers}"
-		fi
-	fi
 
 	if [ "${DNS_MODE}" = "nonuse" ]; then
 		echolog "  - 不对域名进行分流解析"
@@ -120,19 +92,15 @@ helper_prepare() {
 		sort -u "${RULES_PATH}/direct_host" | gen_dnsmasq_items "whitelist,whitelist6" "${fwd_dns}" "${TMP_DNSMASQ_PATH}/11-direct_host.conf"
 		echolog "  - [$?]域名白名单(whitelist)：${fwd_dns:-默认}"
 
-		#始终使用远程DNS解析代理（黑名单）列表
-		if [ "${DNS_MODE}" = "fake_ip" ]; then
-			sort -u "${RULES_PATH}/proxy_host" | gen_dnsmasq_fake_items "11.1.1.1" "${TMP_DNSMASQ_PATH}/90-proxy_host.conf"
+		if [ "$(config_t_get global_subscribe subscribe_proxy 0)" = "0" ]; then
+			#如果没有开启通过代理订阅
+			fwd_dns="${LOCAL_DNS}"
+			for item in $(get_enabled_anonymous_secs "@subscribe_list"); do
+				host_from_url "$(config_n_get ${item} url)" | gen_dnsmasq_items "whitelist,whitelist6" "${fwd_dns}" "${TMP_DNSMASQ_PATH}/12-subscribe.conf"
+			done
+			echolog "  - [$?]节点订阅域名(whitelist)：${fwd_dns:-默认}"
 		else
-			fwd_dns="${TUN_DNS}"
-			[ -n "$CHINADNS_NG" ] && fwd_dns="${china_ng_gfw}"
-			[ -n "$CHINADNS_NG" ] && unset fwd_dns
-			sort -u "${RULES_PATH}/proxy_host" | gen_dnsmasq_items "blacklist,blacklist6" "${fwd_dns}" "${TMP_DNSMASQ_PATH}/90-proxy_host.conf"
-			echolog "  - [$?]代理域名表(blacklist)：${fwd_dns:-默认}"
-		fi
-
-		#如果开启了通过代理订阅
-		[ "$(config_t_get global_subscribe subscribe_proxy 0)" = "1" ] && {
+			#如果开启了通过代理订阅
 			fwd_dns="${TUN_DNS}"
 			[ -n "$CHINADNS_NG" ] && fwd_dns="${china_ng_gfw}"
 			for item in $(get_enabled_anonymous_secs "@subscribe_list"); do
@@ -143,7 +111,18 @@ helper_prepare() {
 				fi
 			done
 			[ "${DNS_MODE}" != "fake_ip" ] && echolog "  - [$?]节点订阅域名(blacklist)：${fwd_dns:-默认}"
-		}
+		fi
+
+		#始终使用远程DNS解析代理（黑名单）列表
+		if [ "${DNS_MODE}" = "fake_ip" ]; then
+			sort -u "${RULES_PATH}/proxy_host" | gen_dnsmasq_fake_items "11.1.1.1" "${TMP_DNSMASQ_PATH}/97-proxy_host.conf"
+		else
+			fwd_dns="${TUN_DNS}"
+			[ -n "$CHINADNS_NG" ] && fwd_dns="${china_ng_gfw}"
+			[ -n "$CHINADNS_NG" ] && unset fwd_dns
+			sort -u "${RULES_PATH}/proxy_host" | gen_dnsmasq_items "blacklist,blacklist6" "${fwd_dns}" "${TMP_DNSMASQ_PATH}/97-proxy_host.conf"
+			echolog "  - [$?]代理域名表(blacklist)：${fwd_dns:-默认}"
+		fi
 
 		#分流规则
 		[ "$(config_n_get $TCP_NODE protocol)" = "_shunt" ] && {
@@ -182,7 +161,7 @@ helper_prepare() {
 			[ -n "${chnlist}" ] && {
 				fwd_dns="${LOCAL_DNS}"
 				[ -n "$CHINADNS_NG" ] && unset fwd_dns
-				sort -u "${TMP_PATH}/chnlist" | gen_dnsmasq_items "chnroute,chnroute6" "${fwd_dns}" "${TMP_DNSMASQ_PATH}/12-chinalist_host.conf"
+				sort -u "${TMP_PATH}/chnlist" | gen_dnsmasq_items "chnroute,chnroute6" "${fwd_dns}" "${TMP_DNSMASQ_PATH}/19-chinalist_host.conf"
 				echolog "  - [$?]中国域名表(chnroute)：${fwd_dns:-默认}"
 			}
 		else
@@ -197,6 +176,34 @@ helper_prepare() {
 		fi
 	fi
 
+	if [ "${DNS_MODE}" != "nouse" ]; then
+		echo "conf-dir=${TMP_DNSMASQ_PATH}" > "/var/dnsmasq.d/dnsmasq-${CONFIG}.conf"
+
+		if [ -z "${CHINADNS_NG}" ] && [ "${IS_DEFAULT_DNS}" = "1" ]; then
+			echolog "  - 不强制设置默认DNS"
+			return
+		else
+			echo "${DEFAULT_DNS}" > $TMP_PATH/default_DNS
+			msg="ISP"
+			servers="${LOCAL_DNS}"
+			[ -n "${chnlist}" ] && msg="中国列表以外"
+			[ -n "${returnhome}" ] && msg="中国列表"
+			[ -n "${global}" ] && msg="全局"
+
+			#默认交给Chinadns-ng处理
+			[ -n "$CHINADNS_NG" ] && {
+				servers="${china_ng_listen}" && msg="chinadns-ng"
+			}
+
+			cat <<-EOF >> "/var/dnsmasq.d/dnsmasq-${CONFIG}.conf"
+				$(echo "${servers}" | sed 's/,/\n/g' | gen_dnsmasq_items)
+				all-servers
+				no-poll
+				no-resolv
+			EOF
+			echolog "  - [$?]以上所列以外及默认(${msg})：${servers}"
+		fi
+	fi
 }
 
 

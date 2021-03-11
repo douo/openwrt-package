@@ -94,6 +94,27 @@ helper_prepare(){
 	    sort -u "${RULES_PATH}/direct_host" | gen_items "whitelist,whitelist6" "${fwd_dns}"
 	    echolog "  - [$?]域名白名单(whitelist)：${fwd_dns:-默认}"
 
+	    if [ "$(config_t_get global_subscribe subscribe_proxy 0)" = "0" ]; then
+		#如果没有开启通过代理订阅
+		fwd_dns="${LOCAL_DNS}"
+		for item in $(get_enabled_anonymous_secs "@subscribe_list"); do
+		    host_from_url "$(config_n_get ${item} url)" | gen_items "whitelist,whitelist6" "${fwd_dns}"
+		done
+		echolog "  - [$?]节点订阅域名(whitelist)：${fwd_dns:-默认}"
+	    else
+		#如果开启了通过代理订阅
+		fwd_dns="${TUN_DNS}"
+		[ -n "$CHINADNS_NG" ] && fwd_dns="${china_ng_gfw}"
+		for item in $(get_enabled_anonymous_secs "@subscribe_list"); do
+		    if [ "${DNS_MODE}" = "fake_ip" ]; then
+			host_from_url "$(config_n_get ${item} url)" | gen_fake_items "11.1.1.1"
+		    else
+			host_from_url "$(config_n_get ${item} url)" | gen_items "blacklist,blacklist6" "${fwd_dns}"
+		    fi
+		done
+		[ "${DNS_MODE}" != "fake_ip" ] && echolog "  - [$?]节点订阅域名(blacklist)：${fwd_dns:-默认}"
+	    fi
+
             #始终使用远程DNS解析代理（黑名单）列表
 	    if [ "${DNS_MODE}" = "fake_ip" ]; then
 		sort -u "${RULES_PATH}/proxy_host" | gen_fake_items "11.1.1.1"
@@ -105,19 +126,6 @@ helper_prepare(){
 		echolog "  - [$?]代理域名表(blacklist)：${fwd_dns:-默认}"
 	    fi
 
-            #如果开启了通过代理订阅
-	    [ "$(config_t_get global_subscribe subscribe_proxy 0)" = "1" ] && {
-		fwd_dns="${TUN_DNS}"
-		[ -n "$CHINADNS_NG" ] && fwd_dns="${china_ng_gfw}"
-		for item in $(get_enabled_anonymous_secs "@subscribe_list"); do
-		    if [ "${DNS_MODE}" = "fake_ip" ]; then
-			host_from_url "$(config_n_get ${item} url)" | gen_fake_items "11.1.1.1"
-		    else
-			host_from_url "$(config_n_get ${item} url)" | gen_items "blacklist,blacklist6" "${fwd_dns}"
-		    fi
-		done
-		[ "${DNS_MODE}" != "fake_ip" ] && echolog "  - [$?]节点订阅域名(blacklist)：${fwd_dns:-默认}"
-	    }
 
             #分流规则
 	    [ "$(config_n_get $TCP_NODE protocol)" = "_shunt" ] && {
