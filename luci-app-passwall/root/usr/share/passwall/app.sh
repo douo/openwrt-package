@@ -15,8 +15,6 @@ LOCK_FILE=/var/lock/$CONFIG.lock
 LOG_FILE=/var/log/$CONFIG.log
 APP_PATH=/usr/share/$CONFIG
 RULES_PATH=/usr/share/${CONFIG}/rules
-TMP_DNSMASQ_PATH=/var/etc/dnsmasq-passwall.d
-DNSMASQ_PATH=/etc/dnsmasq.d
 LOCAL_DOH_PORT=7912
 DNS_PORT=7913
 TUN_DNS="127.0.0.1#${DNS_PORT}"
@@ -354,10 +352,7 @@ load_config() {
         # 不再控制 LOCAL_DNS
 	LOCAL_DNS="default"
 	if [ "${LOCAL_DNS}" = "default" ]; then
-		DEFAULT_DNS=$(uci show dhcp | grep "@dnsmasq" | grep "\.server=" | awk -F '=' '{print $2}' | sed "s/'//g" | tr ' ' ',')
-		if [ -z "${DEFAULT_DNS}" ]; then
-			DEFAULT_DNS=$(echo -n $(sed -n 's/^nameserver[ \t]*\([^ ]*\)$/\1/p' "${RESOLVFILE}" | grep -v "0.0.0.0" | grep -v "127.0.0.1" | grep -v "^::$" | head -2) | tr ' ' ',')
-		fi
+		helper_default_dns
 		LOCAL_DNS="${DEFAULT_DNS:-119.29.29.29}"
 		IS_DEFAULT_DNS=1
 	fi
@@ -696,7 +691,7 @@ node_switch() {
 		#local node_net=$(echo $1 | tr 'A-Z' 'a-z')
 		#uci set $CONFIG.@global[0].${node_net}_node=$node
 		#uci commit $CONFIG
-		restart_helper
+		helper_restart
 	}
 }
 
@@ -967,107 +962,6 @@ start_dns() {
 	[ "${use_tcp_node_resolve_dns}" = "1" ] && echolog "  * 请确认上游 DNS 支持 TCP 查询，如非直连地址，确保 TCP 代理打开，并且已经正确转发！"
 }
 
-add_dnsmasq() {
-	local fwd_dns items item servers msg
-
-        prepare_helper
-
-	if [ "${DNS_MODE}" = "nonuse" ]; then
-		echolog "  - 不对域名进行分流解析"
-	else
-		#屏蔽列表
-		sort -u "${RULES_PATH}/block_host" | gen_fake_items "0.0.0.0" "${TMP_DNSMASQ_PATH}/00-block_host.conf"
-
-		#始终用国内DNS解析节点域名
-		fwd_dns="${LOCAL_DNS}"
-		servers=$(uci show "${CONFIG}" | grep ".address=" | cut -d "'" -f 2)
-		hosts_foreach "servers" host_from_url | grep -v "google.c" | grep '[a-zA-Z]$' | sort -u | gen_items "vpsiplist,vpsiplist6" "${fwd_dns}" "${TMP_DNSMASQ_PATH}/10-vpsiplist_host.conf"
-		echolog "  - [$?]节点列表中的域名(vpsiplist)：${fwd_dns:-默认}"
-
-		#始终用国内DNS解析直连（白名单）列表
-		fwd_dns="${LOCAL_DNS}"
-		[ -n "$CHINADNS_NG" ] && unset fwd_dns
-		sort -u "${RULES_PATH}/direct_host" | gen_items "whitelist,whitelist6" "${fwd_dns}" "${TMP_DNSMASQ_PATH}/11-direct_host.conf"
-		echolog "  - [$?]域名白名单(whitelist)：${fwd_dns:-默认}"
-
-		#始终使用远程DNS解析代理（黑名单）列表
-		if [ "${DNS_MODE}" = "fake_ip" ]; then
-			sort -u "${RULES_PATH}/proxy_host" | gen_fake_items "11.1.1.1" "${TMP_DNSMASQ_PATH}/90-proxy_host.conf"
-		else
-			fwd_dns="${TUN_DNS}"
-			[ -n "$CHINADNS_NG" ] && fwd_dns="${china_ng_gfw}"
-			[ -n "$CHINADNS_NG" ] && unset fwd_dns
-			sort -u "${RULES_PATH}/proxy_host" | gen_items "blacklist,blacklist6" "${fwd_dns}" "${TMP_DNSMASQ_PATH}/90-proxy_host.conf"
-			echolog "  - [$?]代理域名表(blacklist)：${fwd_dns:-默认}"
-		fi
-
-		#如果开启了通过代理订阅
-		[ "$(config_t_get global_subscribe subscribe_proxy 0)" = "1" ] && {
-			fwd_dns="${TUN_DNS}"
-			[ -n "$CHINADNS_NG" ] && fwd_dns="${china_ng_gfw}"
-			for item in $(get_enabled_anonymous_secs "@subscribe_list"); do
-				if [ "${DNS_MODE}" = "fake_ip" ]; then
-					host_from_url "$(config_n_get ${item} url)" | gen_fake_items "11.1.1.1" "${TMP_DNSMASQ_PATH}/91-subscribe.conf"
-				else
-					host_from_url "$(config_n_get ${item} url)" | gen_items "blacklist,blacklist6" "${fwd_dns}" "${TMP_DNSMASQ_PATH}/91-subscribe.conf"
-				fi
-			done
-			[ "${DNS_MODE}" != "fake_ip" ] && echolog "  - [$?]节点订阅域名(blacklist)：${fwd_dns:-默认}"
-		}
-
-		#分流规则
-		[ "$(config_n_get $TCP_NODE protocol)" = "_shunt" ] && {
-			fwd_dns="${TUN_DNS}"
-			local default_node_id=$(config_n_get $TCP_NODE default_node _direct)
-			local shunt_ids=$(uci show $CONFIG | grep "=shunt_rules" | awk -F '.' '{print $2}' | awk -F '=' '{print $1}')
-			for shunt_id in $shunt_ids; do
-				local shunt_node_id=$(config_n_get $TCP_NODE ${shunt_id} nil)
-				if [ "$shunt_node_id" = "nil" ] || [ "$shunt_node_id" = "_default" ] || [ "$shunt_node_id" = "_direct" ] || [ "$shunt_node_id" = "_blackhole" ]; then
-					continue
-				fi
-				local shunt_node=$(config_n_get $shunt_node_id address nil)
-				[ "$shunt_node" = "nil" ] && continue
-				if [ "${DNS_MODE}" = "fake_ip" ]; then
-					config_n_get $shunt_id domain_list | grep -v 'regexp:\|geosite:\|ext:' | sed 's/domain:\|full:\|//g' | tr -s "\r\n" "\n" | sort -u | gen_fake_items "11.1.1.1" "${TMP_DNSMASQ_PATH}/98-shunt_host.conf"
-				else
-					config_n_get $shunt_id domain_list | grep -v 'regexp:\|geosite:\|ext:' | sed 's/domain:\|full:\|//g' | tr -s "\r\n" "\n" | sort -u | gen_items "shuntlist,shuntlist6" "${fwd_dns}" "${TMP_DNSMASQ_PATH}/98-shunt_host.conf"
-				fi
-			done
-			[ "${DNS_MODE}" != "fake_ip" ] && echolog "  - [$?]Xray分流规则(shuntlist)：${fwd_dns:-默认}"
-		}
-
-		#如果没有使用回国模式
-		if [ -z "${returnhome}" ]; then
-			[ ! -f "${TMP_PATH}/gfwlist.txt" ] && sed -n 's/^ipset=\/\.\?\([^/]*\).*$/\1/p' "${RULES_PATH}/gfwlist.conf" | sort -u > "${TMP_PATH}/gfwlist.txt"
-			if [ "${DNS_MODE}" = "fake_ip" ]; then
-				sort -u "${TMP_PATH}/gfwlist.txt" | gen_fake_items "11.1.1.1" "${TMP_DNSMASQ_PATH}/99-gfwlist.conf"
-			else
-				fwd_dns="${TUN_DNS}"
-				[ -n "$CHINADNS_NG" ] && fwd_dns="${china_ng_gfw}"
-				[ -n "$CHINADNS_NG" ] && unset fwd_dns
-				sort -u "${TMP_PATH}/gfwlist.txt" | gen_items "gfwlist,gfwlist6" "${fwd_dns}" "${TMP_DNSMASQ_PATH}/99-gfwlist.conf"
-				echolog "  - [$?]防火墙域名表(gfwlist)：${fwd_dns:-默认}"
-			fi
-			# Not China List 模式
-			[ -n "${chnlist}" ] && {
-				fwd_dns="${LOCAL_DNS}"
-				[ -n "$CHINADNS_NG" ] && unset fwd_dns
-				sort -u "${TMP_PATH}/chnlist" | gen_items "chnroute,chnroute6" "${fwd_dns}" "${TMP_DNSMASQ_PATH}/12-chinalist_host.conf"
-				echolog "  - [$?]中国域名表(chnroute)：${fwd_dns:-默认}"
-			}
-		else
-			#回国模式
-			if [ "${DNS_MODE}" = "fake_ip" ]; then
-				sort -u "${RULES_PATH}/chnlist" | gen_fake_items "11.1.1.1" "${TMP_DNSMASQ_PATH}/99-chinalist_host.conf"
-			else
-				fwd_dns="${TUN_DNS}"
-				sort -u "${RULES_PATH}/chnlist" | gen_items "chnroute,chnroute6" "${fwd_dns}" "${TMP_DNSMASQ_PATH}/99-chinalist_host.conf"
-				echolog "  - [$?]中国域名表(chnroute)：${fwd_dns:-默认}"
-			fi
-		fi
-	fi
-
-}
 
 gen_pdnsd_config() {
 	local listen_port=${1}
@@ -1306,9 +1200,9 @@ start() {
 		start_redir TCP
 		start_redir UDP
 		start_dns
-		add_dnsmasq
+		helper_prepare
 		source $APP_PATH/iptables.sh start
-		restart_helper
+		helper_restart
 
 	}
 	start_crontab
@@ -1327,12 +1221,13 @@ stop() {
 	top -bn1 | grep -v "grep" | grep -v "app.sh" | grep "${CONFIG}/" | awk '{print $1}' | xargs kill -9 >/dev/null 2>&1
 	unset XRAY_LOCATION_ASSET
 	stop_crontab
-	clean_helper
+	helper_clean
 	echolog "清空并关闭相关程序和缓存完成。"
 	unset_lock
 }
 
-source $APP_PATH/dnsmasq_helper.sh
+source $APP_PATH/adguardhome_helper.sh
+# source $APP_PATH/dnsmasq_helper.sh
 
 arg1=$1
 shift
