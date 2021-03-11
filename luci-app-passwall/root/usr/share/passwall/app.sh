@@ -914,7 +914,7 @@ start_dns() {
 	[ -n "$chnlist" ] && [ "$DNS_MODE" != "custom" ] && [ "$DNS_MODE" != "fake_ip" ] && {
 		[ -f "${RULES_PATH}/chnlist" ] && cp -a "${RULES_PATH}/chnlist" "${TMP_PATH}/chnlist"p
                 # 有安装 chinadns-ng 则自动启用
-                [ -n "$(first_type chinadns-ng)" ] && {
+                [ $(config_t_get global chinadnsng_enabled 0) = "1" ] && [ -n "$(first_type chinadns-ng)" ] && {
 			echolog "发现ChinaDNS-NG，将启动。"
 			CHINADNS_NG=1
 		}
@@ -1226,8 +1226,14 @@ stop() {
 	unset_lock
 }
 
-source $APP_PATH/adguardhome_helper.sh
-# source $APP_PATH/dnsmasq_helper.sh
+DNS_HELPER=$(config_t_get global dns_helper "dnsmasq")
+
+# TODO 切换 helper 的时候，清理上个 helper 的配置
+if [ "$DNS_HELPER" = "dnsmasq" ]; then
+    source $APP_PATH/dnsmasq_helper.sh
+else
+    source $APP_PATH/adguardhome_helper.sh
+fi
 
 arg1=$1
 shift

@@ -175,6 +175,15 @@ udp_node:value("tcp_", translate("Same as the tcp node"))
 
 s:tab("DNS", translate("DNS"))
 
+---- ChinaDNS-NG
+o = s:taboption("DNS", Flag, "chinadnsng_enabled", translate("ChinaDNS-NG"))
+o.rmempty = false
+---- DNS Helper
+o = s:taboption("DNS", ListValue, "dns_helper", translate("DNS Helper"), translate("Stop passwall before switching!"))
+o.rmempty = false
+o:reset_values()
+o:value("adgruardhome", translatef("AdGuard Home"))
+o:value("dnsmasq", translatef("dnsmasq"))
 ---- DNS Forward Mode
 o = s:taboption("DNS", ListValue, "dns_mode", translate("Filter Mode"))
 o.rmempty = false

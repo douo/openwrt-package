@@ -1,9 +1,10 @@
-
 config global
 	option enabled '0'
 	option socks_enabled '0'
 	option tcp_node 'nil'
 	option udp_node 'nil'
+        option chinadnsng_enabled '1'
+        option dns_helper 'dnsmasq'
 	option dns_mode 'pdnsd'
 	option up_china_dns 'default'
 	option dns_forward '8.8.8.8'
@@ -32,7 +33,7 @@ config global_forwarding
 	option tcp_redir_ports '22,25,53,143,465,587,993,995,80,443'
 	option udp_redir_ports '1:65535'
 	option proxy_ipv6 '0'
-	
+
 config global_other
 	option status 'big_icon show_check_port show_ip111'
 	option nodes_ping 'auto_ping tcping'
@@ -74,7 +75,7 @@ config global_subscribe
 config auto_switch
 	option testing_time '1'
 	option enable '0'
-	
+
 config nodes '696cd32c1d5149ee95fd1b3accbad6df'
 	option remarks '分流总节点'
 	option type 'Xray'
@@ -86,16 +87,16 @@ config nodes '696cd32c1d5149ee95fd1b3accbad6df'
 	option default_node 'nil'
 	option default_proxy '0'
 	option domainStrategy 'IPIfNonMatch'
-	
+
 config shunt_rules 'ads'
 	option remarks '广告'
 	option domain_list 'geosite:category-ads'
-	
+
 config shunt_rules 'China'
 	option remarks 'China'
 	option domain_list 'geosite:cn'
 	option ip_list 'geoip:cn'
-	
+
 config shunt_rules 'Telegram'
 	option remarks 'Telegram'
 	option ip_list '149.154.160.0/20
