@@ -12,18 +12,25 @@ gen_items(){
 			if(outf == "") outf="/dev/stdout";
 			split(fwd_dns, dns, ","); setdns=length(dns)>0; setlist=length(ipsetlist)>0;
 			if(setdns) for(i in dns) if(length(dns[i])==0) delete dns[i];
+                        if(length(dns)==1) printf("[/") >> outfs
                         if(setlist) printf("    - ") >> outfi
 			fail=1;
 		}
 		! /^$/&&!/^#/ {
 			fail=0
 			if(! (setdns || setlist)) {printf("%s\n", $0) >>outfs; next;}
-                        # AdGuardHome 不支持 [/domain1/]upstream1,upstream2
-                        # https://github.com/AdguardTeam/AdGuardHome/issues/2446
-			if(setdns) for(i in dns) printf("[/%s/]%s\n", $0, dns[i]) >>outfs;
+                        if(length(dns)==1)
+                                printf("%s/", $0) >> outfs
+                        else{
+                                # AdGuardHome 不支持 [/domain1/]upstream1,upstream2
+                                # https://github.com/AdguardTeam/AdGuardHome/issues/2446
+			        if(setdns) for(i in dns) printf("[/%s/]%s\n", $0, dns[i]) >>outfs;
+                        }
 			if(setlist) printf("%s,", $0) >>outfi;
 		}
 		END {
+                        if(length(dns)==1)
+                                printf("]%s\n", dns[1]) >> outfs
                         fflush(outfs);
                         close(outfs);
 
@@ -37,6 +44,7 @@ gen_items(){
 
 }
 
+# 生成 rewrites 项
 gen_fake_items() {
 	local target=${1}; shift 1
 
@@ -47,7 +55,7 @@ gen_fake_items() {
 		}
 		! /^$/&&!/^#/ {
 			fail=0
-                        printf("    - domain: %s\n      answer: %s", $0, target) >> outf
+                        printf("    - domain: \"*.%s\"\n      answer: %s\n", $0, target) >> outf
 		}
 		END {
                         fflush(outf);
@@ -163,7 +171,7 @@ helper_prepare(){
 
 helper_restart(){
     # 首次运行先备份
-    [ ! -f "$TMP_PATH/adguardhome.yaml.bk"] && cp $AGH_YAML $TMP_PATH/adguardhome.yaml.bk
+    [ ! -f "$TMP_PATH/adguardhome.yaml.bk" ] && cp $AGH_YAML $TMP_PATH/adguardhome.yaml.bk
     # 插入 upstreamdns
     # 插入 ipset
     # 插入 rewrites
