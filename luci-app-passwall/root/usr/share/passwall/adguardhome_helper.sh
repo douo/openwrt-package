@@ -1,3 +1,8 @@
+#
+# Copyright (C) 2021 douo
+#
+# 由 app.sh 导入，helper_* 的方法表示由 app.sh 调用
+#
 TMP_AGH_DNS=$TMP_PATH/adguardhome_upstream_dns
 TMP_AGH_IPSET=$TMP_PATH/adguardhome_ipset_tmp
 TMP_AGH_REWRITES=$TMP_PATH/adguardhome_rewrites_tmp
@@ -13,7 +18,7 @@ gen_items(){
 			split(fwd_dns, dns, ","); setdns=length(dns)>0; setlist=length(ipsetlist)>0;
 			if(setdns) for(i in dns) if(length(dns[i])==0) delete dns[i];
                         if(length(dns)==1) printf("[/") >> outfs
-                        if(setlist) printf("    - ") >> outfi
+                        if(setlist) printf("  - ") >> outfi
 			fail=1;
 		}
 		! /^$/&&!/^#/ {
@@ -55,7 +60,7 @@ gen_fake_items() {
 		}
 		! /^$/&&!/^#/ {
 			fail=0
-                        printf("    - domain: \"*.%s\"\n      answer: %s\n", $0, target) >> outf
+                        printf("  - domain: \"*.%s\"\n    answer: %s\n", $0, target) >> outf
 		}
 		END {
                         fflush(outf);
@@ -172,10 +177,15 @@ helper_prepare(){
 helper_restart(){
     # 首次运行先备份
     [ ! -f "$TMP_PATH/adguardhome.yaml.bk" ] && cp $AGH_YAML $TMP_PATH/adguardhome.yaml.bk
-    # 插入 upstreamdns
-    # 插入 ipset
-    # 插入 rewrites
-    sed -i -e  "s/\(\s*\)upstream_dns_file.*/\1upstream_dns_file: ${TMP_AGH_DNS//\//\\\/}/"  -e  "s/\(\s*\)ipset.*/\1ipset:/; /ipset.*/r ${TMP_AGH_IPSET}"  -e  "s/\(\s*\)rewrites.*/\1rewrites:/; /rewrites.*/r ${TMP_AGH_REWRITES}" $AGH_YAML
+
+    sed -i -e  "
+        # 插入 upstreamdns
+        s/\(\s*\)upstream_dns_file.*/\1upstream_dns_file: ${TMP_AGH_DNS//\//\\\/}/
+        # 插入 ipset
+        s/\(\s*\)ipset.*/\1ipset:/; /ipset.*/r ${TMP_AGH_IPSET}
+        # 插入 rewrites
+        s/\(\s*\)rewrites.*/\1rewrites:/; /rewrites.*/r ${TMP_AGH_REWRITES}
+        " $AGH_YAML
 
     /etc/init.d/adguardhome restart >/dev/null 2>&1
     echolog "重启 adguardhome 服务[$?]"
@@ -183,10 +193,21 @@ helper_restart(){
 
 
 helper_clean() {
-    # 清除 upstreamdns
-    # 清除 ipset
-    # 清除 rewrites
-    sed -i -e  's/\(\s*\)upstream_dns_file.*/\1upstream_dns_file: ""/' -e '/ipset.*/,/filtering_enabled.*/ {s/\(\s*\)ipset.*/\1ipset: []/; /ipset.*/b; /filtering_enabled.*/b; d};' -e '/rewrites.*/,/blocked_services.*/ {s/\(\s*\)rewrites.*/\1rewrites: []/; /rewrites.*/b; /blocked_services.*/b; d};' $AGH_YAML
+    sed -i -e  "
+        # 清除 upstreamdns
+        s/\(\s*\)upstream_dns_file.*/\1upstream_dns_file: \"\"/
+        # 清除 ipset，只清除插入的内容，确保原先配置不受影响
+        /ipset.*/,+$([ -f "$TMP_AGH_IPSET" ] && wc -l < $TMP_AGH_IPSET || echo 0){/ipset.*/b; d}
+        # 清除 rewrites，只清除插入的内容，确保原先配置不受影响
+        /rewrites/,+$([ -f "$TMP_AGH_REWRITES" ] && wc -l < $TMP_AGH_REWRITES || echo 0){/rewrites/b; d}
+        " $AGH_YAML
+
+    # 判断 ipset rewrites 清理后是否为空，为空的话写入 ‘[]’
+    sed -i -e '
+        /ipset.*/{N; /-/!s/\(\s*\)ipset:[^\S\r\n]*/\1ipset: []/;}
+        /rewrites.*/{N; /-/!s/\(\s*\)rewrites:[^\S\r\n]*/\1rewrites: []/;}
+        ' $AGH_YAML
+
     rm $TMP_AGH_IPSET
     rm $TMP_AGH_DNS
     rm $TMP_AGH_REWRITES

@@ -1,3 +1,9 @@
+#
+# Copyright (C) 2018-2020 L-WRT Team
+# Copyright (C) 2021 xiaorouji
+#
+# 由 app.sh 导入，helper_* 的方法表示由 app.sh 调用
+#
 TMP_DNSMASQ_PATH=/var/etc/dnsmasq-passwall.d
 DNSMASQ_PATH=/etc/dnsmasq.d
 # 生成 /var/etc/dnsmasq-passwall.d 下的 dnsmasq 配置文件
