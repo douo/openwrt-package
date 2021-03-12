@@ -91,14 +91,14 @@ helper_prepare(){
             #始终用国内DNS解析直连（白名单）列表
 	    fwd_dns="${LOCAL_DNS}"
 	    [ -n "$CHINADNS_NG" ] && unset fwd_dns
-	    sort -u "${RULES_PATH}/direct_host" | gen_items "whitelist,whitelist6" "${fwd_dns}"
+	    sort -u "${RULES_PATH}/direct_host" | gen_items "whitelist,whitelist6" "$(echo ${fwd_dns} |  sed 's/#/:/g')"
 	    echolog "  - [$?]域名白名单(whitelist)：${fwd_dns:-默认}"
 
 	    if [ "$(config_t_get global_subscribe subscribe_proxy 0)" = "0" ]; then
 		#如果没有开启通过代理订阅
 		fwd_dns="${LOCAL_DNS}"
 		for item in $(get_enabled_anonymous_secs "@subscribe_list"); do
-		    host_from_url "$(config_n_get ${item} url)" | gen_items "whitelist,whitelist6" "${fwd_dns}"
+		    host_from_url "$(config_n_get ${item} url)" | gen_items "whitelist,whitelist6" "$(echo ${fwd_dns} |  sed 's/#/:/g')"
 		done
 		echolog "  - [$?]节点订阅域名(whitelist)：${fwd_dns:-默认}"
 	    else
@@ -109,7 +109,7 @@ helper_prepare(){
 		    if [ "${DNS_MODE}" = "fake_ip" ]; then
 			host_from_url "$(config_n_get ${item} url)" | gen_fake_items "11.1.1.1"
 		    else
-			host_from_url "$(config_n_get ${item} url)" | gen_items "blacklist,blacklist6" "${fwd_dns}"
+			host_from_url "$(config_n_get ${item} url)" | gen_items "blacklist,blacklist6" "$(echo ${fwd_dns} |  sed 's/#/:/g')"
 		    fi
 		done
 		[ "${DNS_MODE}" != "fake_ip" ] && echolog "  - [$?]节点订阅域名(blacklist)：${fwd_dns:-默认}"
@@ -122,7 +122,7 @@ helper_prepare(){
 		fwd_dns="${TUN_DNS}"
 		[ -n "$CHINADNS_NG" ] && fwd_dns="${china_ng_gfw}"
 		[ -n "$CHINADNS_NG" ] && unset fwd_dns
-		sort -u "${RULES_PATH}/proxy_host" | gen_items "blacklist,blacklist6" "${fwd_dns}"
+		sort -u "${RULES_PATH}/proxy_host" | gen_items "blacklist,blacklist6" "$(echo ${fwd_dns} |  sed 's/#/:/g')"
 		echolog "  - [$?]代理域名表(blacklist)：${fwd_dns:-默认}"
 	    fi
 
@@ -142,7 +142,7 @@ helper_prepare(){
 		    if [ "${DNS_MODE}" = "fake_ip" ]; then
 			config_n_get $shunt_id domain_list | grep -v 'regexp:\|geosite:\|ext:' | sed 's/domain:\|full:\|//g' | tr -s "\r\n" "\n" | sort -u | gen_fake_items "11.1.1.1"
 		    else
-			config_n_get $shunt_id domain_list | grep -v 'regexp:\|geosite:\|ext:' | sed 's/domain:\|full:\|//g' | tr -s "\r\n" "\n" | sort -u | gen_items "shuntlist,shuntlist6" "${fwd_dns}"
+			config_n_get $shunt_id domain_list | grep -v 'regexp:\|geosite:\|ext:' | sed 's/domain:\|full:\|//g' | tr -s "\r\n" "\n" | sort -u | gen_items "shuntlist,shuntlist6" "$(echo ${fwd_dns} |  sed 's/#/:/g')"
 		    fi
 		done
 		[ "${DNS_MODE}" != "fake_ip" ] && echolog "  - [$?]Xray分流规则(shuntlist)：${fwd_dns:-默认}"
@@ -158,14 +158,14 @@ helper_prepare(){
 		    fwd_dns="${TUN_DNS}"
 		    [ -n "$CHINADNS_NG" ] && fwd_dns="${china_ng_gfw}"
 		    [ -n "$CHINADNS_NG" ] && unset fwd_dns
-		    sort -u "${TMP_PATH}/gfwlist.txt" | gen_items "gfwlist,gfwlist6" "${fwd_dns}"
+		    sort -u "${TMP_PATH}/gfwlist.txt" | gen_items "gfwlist,gfwlist6" "$(echo ${fwd_dns} |  sed 's/#/:/g')"
 		    echolog "  - [$?]防火墙域名表(gfwlist)：${fwd_dns:-默认}"
 		fi
 		# Not China List 模式
 		[ -n "${chnlist}" ] && {
 		    fwd_dns="${LOCAL_DNS}"
 		    [ -n "$CHINADNS_NG" ] && unset fwd_dns
-		    sort -u "${TMP_PATH}/chnlist" | gen_items "chnroute,chnroute6" "${fwd_dns}"
+		    sort -u "${TMP_PATH}/chnlist" | gen_items "chnroute,chnroute6" "$(echo ${fwd_dns} |  sed 's/#/:/g')"
 		    echolog "  - [$?]中国域名表(chnroute)：${fwd_dns:-默认}"
 		}
 	    else
@@ -174,7 +174,7 @@ helper_prepare(){
 		    sort -u "${RULES_PATH}/chnlist" | gen_fake_items "11.1.1.1"
 		else
 		    fwd_dns="${TUN_DNS}"
-		    sort -u "${RULES_PATH}/chnlist" | gen_items "chnroute,chnroute6" "${fwd_dns}"
+		    sort -u "${RULES_PATH}/chnlist" | gen_items "chnroute,chnroute6" "$(echo ${fwd_dns} |  sed 's/#/:/g')"
 		    echolog "  - [$?]中国域名表(chnroute)：${fwd_dns:-默认}"
 		fi
 	    fi
