@@ -4,7 +4,6 @@
 #
 # 由 app.sh 导入，helper_* 的方法表示由 app.sh 调用
 #
-TMP_DNSMASQ_PATH=/var/etc/dnsmasq-passwall.d
 DNSMASQ_PATH=/etc/dnsmasq.d
 # 生成 /var/etc/dnsmasq-passwall.d 下的 dnsmasq 配置文件
 # ARG:
@@ -240,7 +239,7 @@ restore_dnsmasq_servers() {
 }
 
 helper_clean() {
-        rm -rf $TMP_DNSMASQ_PATH $TMP_PATH
+        rm -rf $TMP_DNSMASQ_PATH
 	rm -rf /var/dnsmasq.d/dnsmasq-$CONFIG.conf
 	rm -rf $DNSMASQ_PATH/dnsmasq-$CONFIG.conf
 	rm -rf $TMP_DNSMASQ_PATH
@@ -255,3 +254,5 @@ helper_default_dns(){
 	DEFAULT_DNS=$(echo -n $(sed -n 's/^nameserver[ \t]*\([^ ]*\)$/\1/p' "${RESOLVFILE}" | grep -v "0.0.0.0" | grep -v "127.0.0.1" | grep -v "^::$" | head -2) | tr ' ' ',')
     fi
 }
+
+[ $1="helper_clean" ] && helper_clean

@@ -179,7 +179,7 @@ s:tab("DNS", translate("DNS"))
 o = s:taboption("DNS", Flag, "chinadnsng_enabled", translate("ChinaDNS-NG"))
 o.rmempty = false
 ---- DNS Helper
-o = s:taboption("DNS", ListValue, "dns_helper", translate("DNS Helper"), translate("Stop passwall before switching!"))
+o = s:taboption("DNS", ListValue, "dns_helper", translate("DNS Helper"))
 o.rmempty = false
 o:reset_values()
 o:value("adgruardhome", translatef("AdGuard Home"))

@@ -912,7 +912,7 @@ start_dns() {
 	esac
 
 	[ -n "$chnlist" ] && [ "$DNS_MODE" != "custom" ] && [ "$DNS_MODE" != "fake_ip" ] && {
-		[ -f "${RULES_PATH}/chnlist" ] && cp -a "${RULES_PATH}/chnlist" "${TMP_PATH}/chnlist"p
+		[ -f "${RULES_PATH}/chnlist" ] && cp -a "${RULES_PATH}/chnlist" "${TMP_PATH}/chnlist"
                 # 有安装 chinadns-ng 则自动启用
                 [ $(config_t_get global chinadnsng_enabled 0) = "1" ] && [ -n "$(first_type chinadns-ng)" ] && {
 			echolog "发现ChinaDNS-NG，将启动。"
@@ -1222,13 +1222,20 @@ stop() {
 	unset XRAY_LOCATION_ASSET
 	stop_crontab
 	helper_clean
+        # 运行中切换 DNS helper 需要清理上个 helper 的遗留数据
+        [ -d "$TMP_DNSMASQ_PATH" ] && TMP_DNSMASQ_PATH="$TMP_DNSMASQ_PATH" TMP_PATH="$TMP_PATH" CONFIG="$CONFIG" sh  $APP_PATH/dnsmasq_helper.sh helper_clean
+        [ -d "$TMP_AGH_PATH" ] && TMP_AGH_PATH="$TMP_AGH_PATH" TMP_PATH="$TMP_PATH" CONFIG="$CONFIG" sh $APP_PATH/adguardhome_helper.sh helper_clean
+
+        rm -rf $TMP_PATH
 	echolog "清空并关闭相关程序和缓存完成。"
 	unset_lock
 }
 
 DNS_HELPER=$(config_t_get global dns_helper "dnsmasq")
 
-# TODO 切换 helper 的时候，清理上个 helper 的配置
+# 根据配置导入相应 helper
+TMP_AGH_PATH=/var/etc/adguardhome-passwall.d
+TMP_DNSMASQ_PATH=/var/etc/dnsmasq-passwall.d
 if [ "$DNS_HELPER" = "dnsmasq" ]; then
     source $APP_PATH/dnsmasq_helper.sh
 else

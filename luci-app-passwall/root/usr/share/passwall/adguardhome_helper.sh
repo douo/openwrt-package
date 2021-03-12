@@ -3,9 +3,9 @@
 #
 # 由 app.sh 导入，helper_* 的方法表示由 app.sh 调用
 #
-TMP_AGH_DNS=$TMP_PATH/adguardhome_upstream_dns
-TMP_AGH_IPSET=$TMP_PATH/adguardhome_ipset_tmp
-TMP_AGH_REWRITES=$TMP_PATH/adguardhome_rewrites_tmp
+TMP_AGH_DNS=$TMP_AGH_PATH/adguardhome_upstream_dns
+TMP_AGH_IPSET=$TMP_AGH_PATH/adguardhome_ipset_tmp
+TMP_AGH_REWRITES=$TMP_AGH_PATH/adguardhome_rewrites_tmp
 AGH_YAML=/etc/adguardhome.yaml
 
 gen_items(){
@@ -72,6 +72,8 @@ gen_fake_items() {
 }
 
 helper_prepare(){
+        mkdir -p "${TMP_AGH_PATH}"
+
 	if [ "${DNS_MODE}" != "nouse" ]; then
             echo "$DEFAULT_DNS" | awk -F ',' '{for(i=1;i<NF;i++) print $i}' > $TMP_AGH_DNS
 	fi
@@ -184,7 +186,7 @@ helper_prepare(){
 
 helper_restart(){
     # 首次运行先备份
-    [ ! -f "$TMP_PATH/adguardhome.yaml.bk" ] && cp $AGH_YAML $TMP_PATH/adguardhome.yaml.bk
+    [ ! -f "$TMP_PATH/adguardhome.yaml.bk" ] && cp $AGH_YAML $AGH_YAML.bk_by_passwall
 
     sed -i -e  "
         # 插入 upstreamdns
@@ -216,9 +218,7 @@ helper_clean() {
         /rewrites.*/{N; /-/!s/\(\s*\)rewrites:[^\S\r\n]*/\1rewrites: []/;}
         ' $AGH_YAML
 
-    rm $TMP_AGH_IPSET
-    rm $TMP_AGH_DNS
-    rm $TMP_AGH_REWRITES
+    rm -rf $TMP_AGH_PATH
 
     /etc/init.d/adguardhome restart >/dev/null 2>&1
     echolog "重启 adguardhome 服务[$?]"
@@ -229,3 +229,5 @@ helper_clean() {
 helper_default_dns(){
     DEFAULT_DNS=$(sed -n -e '/upstream_dns:/,/upstream_dns_file:/ {/upstream_dns/b; s/\s*-\s//p}'  $AGH_YAML | tr '\n' ',')
 }
+
+[ $1="helper_clean" ] && helper_clean
